@@ -1,0 +1,194 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>MilkGuard – Steroid Residue Monitor</title>
+<style>
+:root{--bg:#f4f6fb;--card:#fff;--ink:#16203a;--mute:#66708a;--line:#e3e8f2;--brand:#2f6df6;--ok:#14a46b;--warn:#e69a0b;--bad:#e5484d;--okbg:#e3f6ee;--warnbg:#fdf1d9;--badbg:#fde8e9;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--bg:#0e1424;--card:#171f35;--ink:#e8ecf8;--mute:#98a3c0;--line:#27314d;--brand:#6c9bff;--okbg:#10382c;--warnbg:#3d2f0e;--badbg:#42191c;color-scheme:dark}}
+:root[data-theme="dark"]{--bg:#0e1424;--card:#171f35;--ink:#e8ecf8;--mute:#98a3c0;--line:#27314d;--brand:#6c9bff;--okbg:#10382c;--warnbg:#3d2f0e;--badbg:#42191c;color-scheme:dark}
+*{box-sizing:border-box}html{scroll-padding-top:env(safe-area-inset-top,0px)}
+body{margin:0;background:var(--bg);color:var(--ink);font:15px/1.5 Inter,system-ui,-apple-system,"Segoe UI",sans-serif}
+header{display:flex;justify-content:space-between;align-items:center;gap:12px;padding:18px 24px;flex-wrap:wrap}
+h1{font-size:22px;margin:0}h1 span{color:var(--brand)}p.sub{margin:2px 0 0;color:var(--mute);font-size:13px}
+main{max-width:1200px;margin:0 auto;padding:0 20px 40px;display:grid;gap:18px}
+.card{background:var(--card);border:1px solid var(--line);border-radius:16px;padding:18px}
+.card h2{font-size:16px;margin:0 0 12px}
+.kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:14px}
+.kpi{background:var(--card);border:1px solid var(--line);border-radius:16px;padding:16px}
+.kpi small{color:var(--mute);display:block}.kpi b{font-size:28px}
+.row{display:grid;grid-template-columns:repeat(auto-fit,minmax(320px,1fr));gap:18px}
+.filters{display:flex;flex-wrap:wrap;gap:10px;margin-bottom:12px}
+select,input,button{font:inherit;color:var(--ink);background:var(--bg);border:1px solid var(--line);border-radius:10px;padding:8px 10px}
+button{background:var(--brand);color:#fff;border:0;cursor:pointer;font-weight:600}button.ghost{background:var(--bg);color:var(--ink);border:1px solid var(--line)}
+label{display:block;font-size:12px;color:var(--mute);margin-bottom:3px}
+.grid2{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.tw{overflow-x:auto;max-height:420px;overflow-y:auto}
+table{width:100%;border-collapse:collapse;font-size:13.5px}th,td{text-align:left;padding:8px 10px;border-bottom:1px solid var(--line);white-space:nowrap}
+th{color:var(--mute);font-weight:600;position:sticky;top:0;background:var(--card);cursor:pointer}
+.pill{padding:2px 10px;border-radius:99px;font-size:12px;font-weight:600}
+.Safe{background:var(--okbg);color:var(--ok)}.Watch{background:var(--warnbg);color:var(--warn)}.Violation{background:var(--badbg);color:var(--bad)}
+.res{margin-top:14px;padding:14px;border-radius:12px;background:var(--bg);border:1px solid var(--line)}
+.meter{height:12px;background:var(--line);border-radius:9px;overflow:hidden;margin:8px 0}.meter i{display:block;height:100%;width:0;transition:width .4s}
+svg text{fill:var(--mute);font-size:11px}
+ul.info{margin:0;padding-left:18px;color:var(--mute)}ul.info li{margin-bottom:6px}ul.info b{color:var(--ink)}
+.note{font-size:12px;color:var(--mute);margin-top:10px}
+</style>
+</head>
+<body>
+<header>
+  <div><h1>Milk<span>Guard</span> · Steroid Residue Monitor</h1><p class="sub">Dairy quality dashboard · synthetic demo data · updated <span id="today"></span></p></div>
+  <button class="ghost" id="theme">Toggle theme</button>
+</header>
+<main>
+  <section class="kpis" id="kpis"></section>
+
+  <section class="row">
+    <div class="card"><h2>Average residue level by hormone (% of limit)</h2><div id="chart1"></div></div>
+    <div class="card"><h2>Samples by farm &amp; status</h2><div id="chart2"></div></div>
+  </section>
+
+  <section class="card">
+    <h2>Milk samples</h2>
+    <div class="filters">
+      <input id="q" placeholder="Search ID or farm…" style="min-width:180px">
+      <select id="fFarm"></select><select id="fHorm"></select>
+      <select id="fStat"><option value="">All statuses</option><option>Safe</option><option>Watch</option><option>Violation</option></select>
+      <select id="fDays"><option value="30">Last 30 days</option><option value="14">Last 14 days</option><option value="7">Last 7 days</option></select>
+      <button class="ghost" id="reset">Reset</button><button id="csv">Export CSV</button>
+    </div>
+    <div class="tw"><table><thead><tr id="thead"></tr></thead><tbody id="tbody"></tbody></table></div>
+    <p class="note" id="count"></p>
+  </section>
+
+  <section class="row">
+    <div class="card"><h2>Residue trend over time</h2><div id="trend"></div><p class="note">Daily average % of limit for the filtered samples above. Dashed lines: 70 % and 100 %.</p></div>
+    <div class="card"><h2>Batch release tracking</h2><div class="tw" style="max-height:280px"><table><thead><tr><th>Batch</th><th>Volume</th><th>Samples</th><th>Worst</th><th>Lab</th><th>Release</th><th></th></tr></thead><tbody id="bbody"></tbody></table></div><p class="note">A batch with any violating sample cannot be released.</p></div>
+  </section>
+
+  <section class="card">
+    <h2>Add sample / upload results</h2>
+    <div class="grid2" style="grid-template-columns:repeat(auto-fit,minmax(150px,1fr))">
+      <div><label>Date</label><input id="eDate" type="date" value="2026-10-27"></div>
+      <div><label>Farm</label><select id="eFarm"></select></div>
+      <div><label>Hormone</label><select id="eHorm"></select></div>
+      <div><label>Concentration (ng/mL)</label><input id="eConc" type="number" step="any"></div>
+      <div><label>Method</label><select id="eMeth"><option>ELISA</option><option>LC-MS/MS</option></select></div>
+      <div><label>Temp (°C)</label><input id="eTemp" type="number" step="any" value="4"></div>
+      <div><label>Batch</label><input id="eBatch" list="bl" value="B-101"><datalist id="bl"></datalist></div>
+    </div>
+    <div class="filters" style="margin-top:12px"><button id="eAdd">Add sample</button><input type="file" id="eFile" accept=".csv"><span id="eMsg" class="note"></span></div>
+    <p class="note">CSV upload columns: date,farm,hormone,concentration,method,temp,batch (hormone names are matched by their first letters).</p>
+  </section>
+
+  <section class="row">
+    <div class="card">
+      <h2>Steroid level calculator</h2>
+      <div class="grid2">
+        <div><label>Hormone / steroid</label><select id="cH"></select></div>
+        <div><label>Measured concentration (ng/mL)</label><input id="cM" type="number" step="any" value="0.012"></div>
+        <div><label>Dilution factor (×)</label><input id="cD" type="number" step="any" value="2"></div>
+        <div><label>Extraction recovery (%)</label><input id="cR" type="number" step="any" value="85"></div>
+        <div><label>Expanded uncertainty (±%)</label><input id="cU" type="number" step="any" value="15"></div>
+        <div><label>Limit override (ng/mL, optional)</label><input id="cL" type="number" step="any" placeholder="default"></div>
+      </div>
+      <div class="res" id="cRes"></div>
+      <p class="note">Corrected = measured × dilution ÷ (recovery/100). Decision uses the upper bound (corrected + uncertainty).</p>
+    </div>
+    <div class="card">
+      <h2>Reference information</h2>
+      <ul class="info">
+        <li><b>Why test?</b> Natural milk contains trace steroids; illegal growth promoters or therapeutic corticosteroids raise levels above the natural range.</li>
+        <li><b>Screening:</b> ELISA or rapid immunoassay strips for high-throughput first checks.</li>
+        <li><b>Confirmation:</b> LC-MS/MS provides specific, quantitative confirmation of suspect results.</li>
+        <li><b>Sampling:</b> collect from the bulk tank after mixing, chill to 4 °C, freeze if not tested within 24 h; record chain of custody.</li>
+        <li><b>Status rules:</b> Safe &lt; 70 % of limit · Watch 70–100 % · Violation &gt; 100 %. Violations trigger a re-test and batch hold.</li>
+        <li><b>Good practice:</b> run blanks and spiked controls each batch, track recovery, and calibrate against certified standards.</li>
+        <li><b>Limits:</b> thresholds in this demo are <i>illustrative</i>. Replace them with limits from your regulator (e.g. FSSAI, Codex, EU 37/2010).</li>
+      </ul>
+    </div>
+  </section>
+</main>
+<script>
+const HORM={"Estradiol-17β":{lim:0.020,type:"Estrogen"},"Testosterone":{lim:0.050,type:"Androgen"},"Progesterone":{lim:10,type:"Progestogen"},"Dexamethasone":{lim:0.0003,type:"Corticosteroid"},"Prednisolone":{lim:0.006,type:"Corticosteroid"}};
+const FARMS=["Sunrise Dairy","Green Valley Farm","Punjab Fresh Co-op","Ludhiana Milk Hub","Hillside Creamery","Riverbend Farm"];
+const NOW=new Date("2026-10-27");let seed=42;const rnd=()=>(seed=(seed*1664525+1013904223)%4294967296)/4294967296;
+const status=p=>p>100?"Violation":p>=70?"Watch":"Safe";
+const SAMPLES=[];const hn=Object.keys(HORM);
+for(let i=0;i<90;i++){const h=hn[Math.floor(rnd()*hn.length)],f=FARMS[Math.floor(rnd()*FARMS.length)];
+ const r=rnd();let pct=r<.72?5+rnd()*60:r<.92?70+rnd()*30:101+rnd()*60;
+ const d=new Date(NOW-Math.floor(rnd()*30)*864e5);
+ SAMPLES.push({id:"MS-"+(2400+i),date:d.toISOString().slice(0,10),farm:f,h,type:HORM[h].type,conc:+(HORM[h].lim*pct/100).toPrecision(3),pct:+pct.toFixed(1),status:status(pct),method:rnd()<.6?"ELISA":"LC-MS/MS",temp:+(3+rnd()*2.5).toFixed(1),batch:"B-"+(101+Math.floor(rnd()*12))});}
+SAMPLES.sort((a,b)=>b.date.localeCompare(a.date));
+const $=id=>document.getElementById(id);
+$("today").textContent=NOW.toDateString();
+const opt=(el,all,arr)=>el.innerHTML=`<option value="">${all}</option>`+arr.map(x=>`<option>${x}</option>`).join("");
+opt($("fFarm"),"All farms",FARMS);opt($("fHorm"),"All hormones",hn);$("cH").innerHTML=hn.map(x=>`<option>${x}</option>`).join("");
+const cols=[["id","Sample"],["date","Date"],["farm","Farm"],["h","Hormone"],["conc","Conc. (ng/mL)"],["pct","% of limit"],["method","Method"],["temp","Temp °C"],["batch","Batch"],["status","Status"]];
+let sortK="date",sortD=-1;
+$("thead").innerHTML=cols.map(c=>`<th data-k="${c[0]}">${c[1]}</th>`).join("");
+$("thead").onclick=e=>{const k=e.target.dataset.k;if(!k)return;sortD=sortK===k?-sortD:1;sortK=k;render()};
+function filtered(){const q=$("q").value.toLowerCase(),cut=new Date(NOW-$("fDays").value*864e5).toISOString().slice(0,10);
+ return SAMPLES.filter(s=>(!q||(s.id+s.farm).toLowerCase().includes(q))&&(!$("fFarm").value||s.farm===$("fFarm").value)&&(!$("fHorm").value||s.h===$("fHorm").value)&&(!$("fStat").value||s.status===$("fStat").value)&&s.date>=cut)
+ .sort((a,b)=>(a[sortK]>b[sortK]?1:-1)*sortD)}
+const col={Safe:"var(--ok)",Watch:"var(--warn)",Violation:"var(--bad)"};
+function render(){const d=filtered();
+ $("tbody").innerHTML=d.map(s=>`<tr><td>${s.id}</td><td>${s.date}</td><td>${s.farm}</td><td>${s.h}</td><td>${s.conc}</td><td>${s.pct}%</td><td>${s.method}</td><td>${s.temp}</td><td>${s.batch}</td><td><span class="pill ${s.status}">${s.status}</span></td></tr>`).join("")||`<tr><td colspan="9">No samples match these filters.</td></tr>`;
+ $("count").textContent=`${d.length} of ${SAMPLES.length} samples shown`;trend(d);batches();
+ const n=d.length||1,c=k=>d.filter(s=>s.status===k).length,avg=d.reduce((a,s)=>a+s.pct,0)/n;
+ $("kpis").innerHTML=[["Samples tested",d.length,""],["Compliance rate",(100*c("Safe")/n).toFixed(0)+"%","var(--ok)"],["Watch list",c("Watch"),"var(--warn)"],["Violations",c("Violation"),"var(--bad)"],["Avg % of limit",avg.toFixed(0)+"%",""]].map(k=>`<div class="kpi"><small>${k[0]}</small><b style="color:${k[2]||"inherit"}">${k[1]}</b></div>`).join("");
+ // chart 1
+ const W=520,rowH=38;let s1=`<svg viewBox="0 0 ${W} ${hn.length*rowH+10}" width="100%">`;
+ hn.forEach((h,i)=>{const x=d.filter(s=>s.h===h),a=x.length?x.reduce((t,s)=>t+s.pct,0)/x.length:0,w=Math.min(a,150)/150*300,y=i*rowH+6;
+  s1+=`<text x="0" y="${y+17}">${h}</text><rect x="115" y="${y+4}" width="300" height="18" rx="9" fill="var(--line)"/><rect x="115" y="${y+4}" width="${w}" height="18" rx="9" fill="${col[status(a)]}"/><text x="425" y="${y+17}">${a.toFixed(0)}%</text>`});
+ $("chart1").innerHTML=s1+`<line x1="${115+200}" x2="${115+200}" y1="0" y2="${hn.length*rowH}" stroke="var(--bad)" stroke-dasharray="4"/></svg><p class="note">Dashed line = 100 % of limit.</p>`;
+ // chart 2
+ let s2=`<svg viewBox="0 0 ${W} ${FARMS.length*rowH+10}" width="100%">`;
+ FARMS.forEach((f,i)=>{const x=d.filter(s=>s.farm===f),y=i*rowH+6;let off=190;const t=Math.max(...FARMS.map(ff=>d.filter(s=>s.farm===ff).length),1);
+  s2+=`<text x="0" y="${y+17}">${f}</text>`;
+  ["Safe","Watch","Violation"].forEach(k=>{const w=x.filter(s=>s.status===k).length/t*280;s2+=`<rect x="${off}" y="${y+4}" width="${w}" height="18" fill="${col[k]}"/>`;off+=w});
+  s2+=`<text x="${off+8}" y="${y+17}">${x.length}</text>`});
+ $("chart2").innerHTML=s2+`</svg><p class="note"><span class="pill Safe">Safe</span> <span class="pill Watch">Watch</span> <span class="pill Violation">Violation</span></p>`;
+}
+["q","fFarm","fHorm","fStat","fDays"].forEach(i=>$(i).oninput=render);
+$("reset").onclick=()=>{["q","fFarm","fHorm","fStat"].forEach(i=>$(i).value="");$("fDays").value="30";render()};
+$("csv").onclick=()=>{const d=filtered(),t=[cols.map(c=>c[1]).join(",")].concat(d.map(s=>cols.map(c=>s[c[0]]).join(","))).join("\n");navigator.clipboard&&navigator.clipboard.writeText(t).then(()=>alert("CSV of "+d.length+" rows copied to clipboard."),()=>alert(t))};
+$("theme").onclick=()=>{const r=document.documentElement,dark=getComputedStyle(r).colorScheme.includes("dark")||r.dataset.theme==="dark";r.dataset.theme=dark?"light":"dark"};
+// calculator
+function calc(){const h=$("cH").value,m=+$("cM").value,df=+$("cD").value||1,rc=+$("cR").value||100,u=+$("cU").value||0,lim=+$("cL").value||HORM[h].lim;
+ const cor=m*df/(rc/100),up=cor*(1+u/100),lo=cor*(1-u/100),pct=up/lim*100,st=status(pct);
+ $("cRes").innerHTML=`<b style="font-size:20px">${cor.toPrecision(3)} ng/mL</b> corrected <span class="pill ${st}" style="margin-left:6px">${st}</span>
+ <div class="meter"><i style="width:${Math.min(pct,100)}%;background:${col[st]}"></i></div>
+ Range: ${lo.toPrecision(3)} – ${up.toPrecision(3)} ng/mL · Limit: ${lim} ng/mL<br>Upper bound = <b>${pct.toFixed(1)}%</b> of limit. ${st==="Violation"?"Confirm by LC-MS/MS and hold the batch.":st==="Watch"?"Re-test and increase monitoring of this supplier.":"Within limits; release batch."}`}
+["cH","cM","cD","cR","cU","cL"].forEach(i=>$(i).oninput=calc);
+let SERVER=false;
+const LS=k=>{try{return JSON.parse(localStorage.getItem(k))}catch(e){return null}},SV=(k,v)=>{try{localStorage.setItem(k,JSON.stringify(v))}catch(e){}};
+const extra=LS("mg_extra")||[];extra.forEach(s=>SAMPLES.push(s));let BST=LS("mg_batches")||{};
+$("eFarm").innerHTML=FARMS.map(x=>`<option>${x}</option>`).join("");$("eHorm").innerHTML=hn.map(x=>`<option>${x}</option>`).join("");
+$("bl").innerHTML=[...new Set(SAMPLES.map(s=>s.batch))].sort().map(b=>`<option>${b}</option>`).join("");
+let seq=0;
+function mk(o){const lim=HORM[o.h].lim,pct=+(o.conc/lim*100).toFixed(1);return{id:"MS-"+Date.now().toString(36).slice(-5)+(seq++),date:o.date,farm:o.farm,h:o.h,type:HORM[o.h].type,conc:+o.conc,pct,status:status(pct),method:o.method||"ELISA",temp:+o.temp||4,batch:o.batch||"B-101"}}
+function add(list){list.forEach(o=>{const s=mk(o);SAMPLES.push(s);if(SERVER)fetch("/api/samples",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(s)}).catch(()=>{});else extra.push(s)});if(!SERVER)SV("mg_extra",extra);SAMPLES.sort((a,b)=>b.date.localeCompare(a.date));render()}
+$("eAdd").onclick=()=>{const c=+$("eConc").value;if(!(c>=0)||!$("eConc").value||!$("eDate").value){$("eMsg").textContent="Enter a date and a valid concentration.";return}
+ add([{date:$("eDate").value,farm:$("eFarm").value,h:$("eHorm").value,conc:c,method:$("eMeth").value,temp:$("eTemp").value,batch:$("eBatch").value.trim()}]);$("eMsg").textContent="Sample added.";$("eConc").value=""};
+$("eFile").onchange=e=>{const f=e.target.files[0];if(!f)return;const r=new FileReader();r.onload=()=>{const L=r.result.trim().split(/\r?\n/),H=L.shift().split(",").map(x=>x.trim().toLowerCase()),ok=[];let bad=0;
+ L.forEach(l=>{const v=l.split(","),o={};H.forEach((k,i)=>o[k]=(v[i]||"").trim());const hk=hn.find(k=>o.hormone&&k.toLowerCase().startsWith(o.hormone.toLowerCase().slice(0,4)));const c=parseFloat(o.concentration);
+  if(hk&&c>=0&&/^\d{4}-\d{2}-\d{2}$/.test(o.date))ok.push({date:o.date,farm:o.farm||FARMS[0],h:hk,conc:c,method:o.method,temp:o.temp,batch:o.batch});else bad++});
+ add(ok);$("eMsg").textContent=`${ok.length} samples imported, ${bad} skipped.`;e.target.value=""};r.readAsText(f)};
+function trend(d){const m={};d.forEach(s=>(m[s.date]=m[s.date]||[]).push(s.pct));const ks=Object.keys(m).sort();if(!ks.length){$("trend").innerHTML="<p class=note>No data for these filters.</p>";return}
+ const pts=ks.map(k=>m[k].reduce((a,b)=>a+b,0)/m[k].length),mx=Math.max(120,...pts),W=520,H=200,L=34,B=24,x=i=>L+(ks.length>1?i/(ks.length-1):.5)*(W-L-10),y=v=>H-B-v/mx*(H-B-10);
+ let s=`<svg viewBox="0 0 ${W} ${H}" width="100%">`;[70,100].forEach(v=>s+=`<line x1="${L}" x2="${W-10}" y1="${y(v)}" y2="${y(v)}" stroke="${v>99?"var(--bad)":"var(--warn)"}" stroke-dasharray="4"/><text x="0" y="${y(v)+4}">${v}%</text>`);
+ s+=`<polyline fill="none" stroke="var(--brand)" stroke-width="2" points="${pts.map((v,i)=>x(i)+","+y(v)).join(" ")}"/>`+pts.map((v,i)=>`<circle cx="${x(i)}" cy="${y(v)}" r="3.5" fill="${col[status(v)]}"><title>${ks[i]}: ${v.toFixed(0)}%</title></circle>`).join("")+`<text x="${L}" y="${H-6}">${ks[0].slice(5)}</text><text x="${W-40}" y="${H-6}">${ks[ks.length-1].slice(5)}</text></svg>`;$("trend").innerHTML=s}
+function batches(){const m={};SAMPLES.forEach(s=>(m[s.batch]=m[s.batch]||[]).push(s));
+ $("bbody").innerHTML=Object.keys(m).sort().map(id=>{const a=m[id],w=Math.max(...a.map(s=>s.pct)),st=status(w),b=BST[id]||(BST[id]={vol:4000+((parseInt(id.slice(2))||0)%7)*1000,state:"Pending"});if(st==="Violation"&&b.state==="Released")b.state="Held";
+  const cl={Released:"Safe",Held:"Violation",Pending:"Watch"}[b.state]||"Watch";
+  return `<tr><td>${id}</td><td>${b.vol} L</td><td>${a.length}</td><td>${w.toFixed(0)}%</td><td><span class="pill ${st}">${st}</span></td><td><span class="pill ${cl}">${b.state}</span></td><td><button class="ghost" data-b="${id}" data-a="Released" ${st==="Violation"?"disabled":""}>Release</button> <button class="ghost" data-b="${id}" data-a="Held">Hold</button></td></tr>`}).join("")}
+$("bbody").onclick=e=>{const b=e.target.dataset.b;if(!b)return;BST[b].state=e.target.dataset.a;SV("mg_batches",BST);if(SERVER)fetch("/api/batches/"+b,{method:"PATCH",headers:{"Content-Type":"application/json"},body:JSON.stringify({state:BST[b].state})}).catch(()=>{});batches()};
+// Server mode: if the Flask API is reachable, use the database instead of browser storage
+fetch("/api/samples").then(r=>r.ok?r.json():Promise.reject()).then(d=>{SERVER=true;SAMPLES.length=0;d.forEach(s=>SAMPLES.push(s));return fetch("/api/batches")}).then(r=>r.json()).then(b=>{BST=b;render()}).catch(()=>{});
+SAMPLES.sort((a,b)=>b.date.localeCompare(a.date));
+render();calc();
+</script>
+</body>
+</html>
